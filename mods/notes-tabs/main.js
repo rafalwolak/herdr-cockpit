@@ -1,6 +1,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, nextCommand } from "herdr";
+import HostVitals from "./host-vitals.js";
+import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, nextCommand, checking } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -29,11 +30,13 @@ function label(tab, lead) {
 
 export default class Tabs extends View {
   init(_props, cx) {
+    this.vitals = new HostVitals();
     this.pressed = null;
     this.scroll = ScrollHandle.new();
     try { this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}"); } catch { this.panels = {}; }
     if (!this.panels || typeof this.panels !== "object" || Array.isArray(this.panels)) this.panels = {};
     this.swipe = { acc: 0, steps: 0, at: 0, last: 0 };
+    if (checking()) return;
     cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
@@ -153,7 +156,8 @@ export default class Tabs extends View {
     };
     return h_flex().size_full().min_w(0).px(10).pl(lightsPadding).gap(3).items_center().bg(t.chrome).border_b(1).border_color(t.border)
       .on_mouse_up("left", () => { this.pressed = null; })
-      .on_scroll_wheel(e => this.wheel(e))
+      .on_size_change((size, cx) => this.vitals.resize(size.width, cx))
+      .on_scroll_wheel(e => { if (this.vitals.anchor === null) this.wheel(e); })
       .child(h_flex().id("tab-scroll").flex_1().min_w(0).h_full().items_center().gap(3).overflow_x_scrollbar().track_scroll(this.scroll)
         .on_size_change((_size, cx) => { if (active >= 0) { this.scroll.scroll_to_item(active); cx.notify(); } })
         .children(shown.map(item)))
@@ -161,6 +165,7 @@ export default class Tabs extends View {
       .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
       .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/changes/changes.svg")))
       .child(panelButton("notes", "Notes", "mods/workspace-chrome/file-text.svg"))
+      .child(this.vitals.render(t, space?.machine ?? null))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/notes-tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/notes-tabs/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/notes-tabs/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));

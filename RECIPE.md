@@ -1,6 +1,6 @@
 # Herdr Cockpit
 
-Keep one Markdown note per space. The Notes button beside Files and Changes toggles the right-hand panel. Click the page to edit. Leaving it restores the formatted preview.
+Keep one Markdown note per space, organize spaces into folders and monitor agent limits and host resources in the Notes layout.
 
 ![Notes](preview.png)
 
@@ -9,6 +9,8 @@ Keep one Markdown note per space. The Notes button beside Files and Changes togg
 Use the default Herdr window: a 268px spaces/agents sidebar, the terminal work area, and an optional right panel. Preserve the left sidebar's 46px brand row, equal-weight spaces and agents lists (90px minimum each), and 69px footer. The center has a 42px tab bar, a work area with 8px padding/gaps, and a 28px status bar. Terminal cards have 10px corners, 1px borders/focus outlines and 30px headers.
 
 The right panel starts at 368px and resizes between 280px and 900px. Files, Changes and Notes share it. Notes is always available. The tab bar restores each space’s most recent panel choice.
+
+Show nested folders in Spaces and remaining context under each supported agent. Place the focused agent’s limits in the bottom status bar and host CPU and RAM beside the Notes button. Each opens a details popover.
 
 Match the Files card with 10px corners and a 1px theme border. The border takes the accent color when the panel or a text field has focus. The 42px header has 14px left padding, 8px right padding and a bottom divider. Use a 13px semibold title, a right-aligned 12px space name, a transient saving indicator and a 22px gear button with a 14px icon. The document fills the remaining height with 14px horizontal and 12px vertical padding.
 
@@ -19,6 +21,12 @@ Use Herdr’s UI font and size by default, with Geist at 13px as the fallback. A
 Appearance offers Zen and Markdown colors previews, a font family, sizes from 11px to 24px and three line spacings. Follow Herdr resets the font and spacing overrides. Use the same cropped native screenshot of a sample note for `preview.png` and `layouts/notes.png`.
 
 ## How it behaves
+
+Right-click a space and choose **Move to group…**. Right-click a group to add a subgroup. Groups remember their members, order and collapsed state per machine. Linked worktrees follow their main checkout. Removing a group moves its children and spaces up one level.
+
+Click the usage bar to see the focused Codex or Claude Code session’s context, five-hour and weekly limits, reported resets and up to an hour of usage history. The remaining percentage turns amber at 20% and red at 10%. Claude Code can publish exact reset times through the optional status-line command in the README.
+
+Click a host in the tab bar for a five-minute CPU graph, memory, swap, disk, network throughput, load and uptime. Use the picker to inspect another host. On a narrow bar, show just the host icon. Sample connected hosts about every five seconds while the window is active or the popover is open, and every thirty seconds in the background.
 
 Click Notes to select/show the panel; clicking it again closes it. Files and Changes retain their behavior. Panel selection/closed state is remembered per space, and the edge resizes by dragging. Tabs inside the same space share a note.
 
@@ -38,9 +46,9 @@ Preserve inherited tab selection, close, new-tab menu, right-click menu, double-
 
 Start from Herdr 0.1.17’s main layout. Its left sidebar holds spaces and agents. The work column holds the tabs, the active tab and the status bar. Add Notes after Files and Changes in the panel-body stack. Keep the panel hidden initially with Files as the default stack child. Set the layout preview to `layouts/notes.png`.
 
-Use the shipped workspace-chrome, spaces, agents, pane, files, changes, workspace-status, menu and new-menu mods. Base notes-tabs on the 0.1.17 tabs mod, including its Windows controls, live tab titles and scroll behavior. Add Notes to its local panel choices. Use the shipped file-text icon for the tab button and the shipped settings icon for the panel menu.
+Use the shipped workspace-chrome, pane, files, changes, menu and new-menu mods. Bind spaces to notes-space-groups, agents to notes-usage-agents and status to notes-usage-status. Base notes-tabs on the 0.1.17 tabs mod, including its Windows controls, live tab titles and scroll behavior. Add Notes to its local panel choices. Use the shipped file-text icon for the tab button and the shipped settings icon for the panel menu.
 
-The Notes mod consists of main.js, markdown.js and its focusable mod.json. Use native GPUI controls for the editor, preview, checkboxes and font field. Track the card’s focus handle and accept the focus command from pane navigation. The two mods take no props.
+The Notes mod consists of main.js, markdown.js and its focusable mod.json. Use native GPUI controls for the editor, preview, checkboxes and font field. Track the card’s focus handle and accept the focus command from pane navigation. The note panel and tab bar require no layout props.
 
 Keep a Map of loaded pads per space ID. Each pad holds its path, raw Markdown, last disk snapshot, error/save/loading state and one lazily created native input. Loading a newly selected space starts one asynchronous file read and caches the pad immediately; native text states are created in initialization or a real edit event, never during render. The full-note input updates only its captured pad, even if the active space changes. On close, flush localStorage for recovery.
 
@@ -54,17 +62,18 @@ Migration is lazy. Existing Markdown takes precedence over legacy localStorage s
 
 Read the installed AGENTS.md and generated type files first. Use native GPUI, not HTML/CSS/DOM or a web view. Shipped files are replaced on restart: keep personal clones. Do not package generated type files, personal settings, local storage or private screenshots. Keep the panel and panel-body layout IDs, and retain Windows controls and macOS traffic-light padding in the cloned tab bar.
 
-An async callback runs immediately until its first await; spawning alone does not leave the render phase. Never create native text state while rendering or notify during render. Never retain a callback's context across an await; use the context given to the spawned task. Use no redraw timer. The 350ms timer is a cancellable save debounce, not an animation or poll.
+An async callback runs immediately until its first await. Create native text state outside render and use the spawned task’s context after an await. The Notes editor uses a cancellable 350ms save debounce and redraws on change.
 
 A bare numeric line_height was visually wrong in this runtime: use a string with px units. Textarea fills the page and owns its scroll; do not wrap it in another scrolling document or size it as a small paragraph editor. Avoid setting its value on every render, which would disrupt selection. A native check only covers eager rendering; also show the full-note editor and menu and appearance controls in the actual app.
 
 Notes are local per-space data, not repository files or cross-device sync. Renaming a space keeps its file; a new ID gets a new file. Watch the notes directory with native watchFolder after creating it, rearming the watch before each refresh. Reload cached pads when files change, skipping pads that are loading or saving. Recheck the disk snapshot and local text after the asynchronous read. When clean, update source, disk snapshot and any retained textarea; ignore unchanged textarea change events. When dirty, keep the draft and old expected snapshot, and show a conflict. Report watcher failures in the panel. Conflicts require manual merging. Local recovery reduces the risk of closing during the debounce but is not a guarantee after forced termination before its storage flush. Reads are limited to the host's 1 MiB text-file limit. Task detection is intended for ordinary bullet checklists and fenced code, not every Markdown dialect. Heading labels are native text rather than a full inline-Markdown editor.
 
-Linux/Windows code paths have not been runtime-tested; macOS is verified. Never publish the raw app frame: crop to demo notes only. Remove temporary demo UI after checking, but retain any demo Markdown the person edited.
+The Notes editor was tested on macOS. Its Linux and Windows paths still need runtime verification. Crop published previews to demo notes. Remove temporary demo UI after checking and retain any demo Markdown the person edited.
 
 ## Done when
 
-- Both mods pass herdr-app check, and the actual app shows no new mod/layout errors.
+- All five mods pass herdr-app check, and the app loads the Notes layout without errors.
+- Nested groups survive reloads. The focused agent’s limits open into a history view, and the toolbar opens the selected host’s resource details.
 - Notes opens beside Files and Changes and behaves as one continuous page with no mode toggle or paragraph controls.
 - Clicking the page produces one full-height native editor containing the exact entire note. Clicking outside or blurring returns to formatted text without changing source or adding separators.
 - The same input is reused when re-entering, and an edit from one space still saves to that space after selection changes.
@@ -74,5 +83,5 @@ Linux/Windows code paths have not been runtime-tested; macOS is verified. Never 
 - Existing local-storage notes migrate without deleting the old key; existing files take precedence; recoverable drafts restore only against their matching base.
 - External edits appear in clean preview/editor states without a writeback. Local edits made before or during a refresh survive, and cached spaces update independently.
 - File-save failures preserve the draft, and a conflicting external edit is not overwritten, including by Retry. Overlapping saves finish with the newest text.
-- node --test tests/notes.test.mjs passes. The tests mock native controls and file APIs; do not claim physical keyboard or process-restart testing.
-- The public package includes the layout, both custom mods, this recipe, safe preview assets and the herdr-layout topic. Switching to main restores the default layout without ending terminals.
+- Run `node --test tests/*.test.mjs`. Use the desktop app to verify native interactions.
+- The public package includes the layout, five custom mods, this recipe, safe preview assets and the herdr-layout topic. Switching to main restores the default layout without ending terminals.

@@ -50,7 +50,7 @@
               },
               "min": 90,
               "content": {
-                "mod": "spaces"
+                "mod": "notes-space-groups"
               }
             },
             {
@@ -61,7 +61,7 @@
               },
               "min": 90,
               "content": {
-                "mod": "agents"
+                "mod": "notes-usage-agents"
               }
             }
           ]
@@ -181,7 +181,7 @@
             "px": 28
           },
           "content": {
-            "mod": "workspace-status"
+            "mod": "notes-usage-status"
           }
         }
       ]
