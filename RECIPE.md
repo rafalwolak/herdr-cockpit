@@ -1,4 +1,4 @@
-# Notes
+# Herdr Cockpit
 
 Keep one Markdown note per space. The Notes button beside Files and Changes toggles the right-hand panel. Click the page to edit. Leaving it restores the formatted preview.
 

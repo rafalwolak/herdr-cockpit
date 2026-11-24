@@ -1,4 +1,4 @@
-# Herdr Notes
+# Herdr Cockpit
 
 Keep one Markdown note per Herdr space. **Notes** opens beside **Files** and **Changes** with the same header, icons and focus border. Changes save automatically to a local Markdown file.
 
@@ -8,7 +8,7 @@ Keep one Markdown note per Herdr space. **Notes** opens beside **Files** and **C
 
 In a Herdr chat, ask your agent to install this layout.
 
-> Read my Herdr app's AGENTS.md and install the Notes layout from https://github.com/rafalwolak/herdr-notes.
+> Read my Herdr app's AGENTS.md and install the Notes layout from https://github.com/rafalwolak/herdr-cockpit.
 
 For a manual install, copy these four paths from the repository into the matching locations under your Herdr app home. The default is `~/.config/herdr-app`. Check for name conflicts before copying.
 
