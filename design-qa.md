@@ -1,4 +1,6 @@
-# Quiet Margin verification
+# Original Herdr 0.1.13 design checks
+
+This record covers the upstream layout. The current design is documented in the [layout recipe](RECIPE.md).
 
 final result: passed
 

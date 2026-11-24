@@ -1,6 +1,6 @@
 # Notes
 
-Keep one continuous Markdown note beside your terminals in Herdr. Notes opens from the same tab-bar controls as Files and Changes. Click the page to write anywhere in the whole note; leaving it restores formatted Markdown automatically. The interface stays quiet: a small title, the continuous page, and one overflow menu for appearance and file actions. There are no paragraph boxes, add-block buttons or Write/Preview tabs.
+Keep one Markdown note per space. The Notes button beside Files and Changes toggles the right-hand panel. Click the page to edit. Leaving it restores the formatted preview.
 
 ![Notes](preview.png)
 
@@ -8,15 +8,15 @@ Keep one continuous Markdown note beside your terminals in Herdr. Notes opens fr
 
 Use the default Herdr window: a 268px spaces/agents sidebar, the terminal work area, and an optional right panel. Preserve the left sidebar's 46px brand row, equal-weight spaces and agents lists (90px minimum each), and 69px footer. The center has a 42px tab bar, a work area with 8px padding/gaps, and a 28px status bar. Terminal cards have 10px corners, 1px borders/focus outlines and 30px headers.
 
-The right panel starts at 400px and resizes between 280px and 900px. Files, Changes and Notes share it, one shown at a time. Notes is always available; the other two follow existing panel preferences. Start the panel closed unless the tab bar restores a saved choice for that space.
+The right panel starts at 368px and resizes between 280px and 900px. Files, Changes and Notes share it. Notes is always available. The tab bar restores each space’s most recent panel choice.
 
-The Notes surface has 10px corners and no extra card border. A 36px header has 24px horizontal padding, a 12px semibold Notes label, a 12px dim truncated space name, transient Saving… text, and one overflow button. No document icon, Aa button, close button, mode toggle, persistent save status, task count or footer. The document fills the remaining height with 28px horizontal padding, 24px top padding and 28px bottom padding.
+Match the Files card with 10px corners and a 1px theme border. The border takes the accent color when the panel or a text field has focus. The 42px header has 14px left padding, 8px right padding and a bottom divider. Use a 13px semibold title, a right-aligned 12px space name, a transient saving indicator and a 22px gear button with a 14px icon. The document fills the remaining height with 14px horizontal and 12px vertical padding.
 
 Use the person's current Herdr theme and fonts rather than hardcoding the mock's graphite/sage palette. In Zen, body and every heading use foreground; links and native controls follow the host theme, checkboxes and quotes use accent, and secondary text uses muted/dim. Heading sizes are body +8px for H1, +4px for H2 and +2px for deeper levels. Task controls are 15px with 4px corners; completed text is struck through. Quotes have a 2px accent line. Use the native code renderer without a second padded card around it. Markdown colors keeps this layout but uses theme ansi5 for H1, ansi4 for H2, ansi6 for deeper headings and checked tasks, ansi5 for quote borders and ansi3 for a 2px code border with 8px left padding. Source editing keeps the same plain native textarea.
 
-The body follows Herdr's normalized font_family/font_size terminal settings, falling back to JetBrains Mono and 14px. Default line spacing is 1.6 times the body size, stated with explicit px units. The overflow menu is a 252px-wide absolute overlay, 34px from the top and 12px from the right, with 6px padding, 8px corners, the popover background and a subtle border/shadow. Its rows are Appearance, Reveal file and Copy path, each with 12px horizontal and 8px vertical padding. The abbreviated path is shown only at the bottom of this menu, with its full path in a tooltip.
+Use Herdr’s UI font and size by default, with Geist at 13px as the fallback. Apply note-specific font and spacing preferences to the document and editor. Default line spacing is 1.6 times the document size. Place the 252px appearance and file menu 43px from the top and 8px from the right. Show the shortened file path in the menu and the full path in its tooltip.
 
-Appearance expands inside the menu, with a Preview style choice of Zen (default) or Markdown colors, then Follow Herdr, A−, the current size and A+; a text input for a font family; and Compact, Normal and Roomy choices (1.4, 1.6, 1.85). Font sizes range from 11 to 24px. The preview is a crop of the actual native reading view using a disposable Studio note. Supply it as preview.png and layouts/notes.png. Demo text is not seeded into real pads.
+Appearance offers Zen and Markdown colors previews, a font family, sizes from 11px to 24px and three line spacings. Follow Herdr resets the font and spacing overrides. Use the same cropped native screenshot of a sample note for `preview.png` and `layouts/notes.png`.
 
 ## How it behaves
 
@@ -36,11 +36,11 @@ Preserve inherited tab selection, close, new-tab menu, right-click menu, double-
 
 ## Built from
 
-Clone the installed Herdr 0.1.13 main layout into layouts/notes.json, preserving cloned_from metadata. Set preview to layouts/notes.png. The tree is root row → sidebar column and work column; sidebar → brand, sidebar-lists (spaces/agents), sidebar-footer; work → tabs, work-body, status; work-body → main active-tab block and panel column; panel → panel-body stack with files, changes and notes children. Keep panel hidden and panel-body active files by default. Set the panel width to 400px.
+Start from Herdr 0.1.17’s main layout. Its left sidebar holds spaces and agents. The work column holds the tabs, the active tab and the status bar. Add Notes after Files and Changes in the panel-body stack. Keep the panel hidden initially with Files as the default stack child. Set the layout preview to `layouts/notes.png`.
 
-Use shipped workspace-chrome, spaces, agents, pane, files, changes, workspace-status, menu and new-menu mods and their assets. Clone tabs into notes-tabs, including its four Windows button SVGs and clone metadata. Rewrite its own SVG paths. Add notes to the enabled panel IDs locally without changing shared workspace.panels. Add the Notes button with the existing panel select/show/hide behavior, preserving the tab bar's saved per-space panel map and platform chrome.
+Use the shipped workspace-chrome, spaces, agents, pane, files, changes, workspace-status, menu and new-menu mods. Base notes-tabs on the 0.1.17 tabs mod, including its Windows controls, live tab titles and scroll behavior. Add Notes to its local panel choices. Use the shipped file-text icon for the tab button and the shipped settings icon for the panel menu.
 
-Create mods/notes/main.js, markdown.js, mod.json (place none, title Notes) and an original note.svg (24px outline page, folded corner, two text lines). The main View uses div/svg from gpui-kit and flex, TextareaState/Textarea, TextView, InputState/Input and Checkbox from gpui-base. Read spaces, theme, settings, window and home from herdr; call exec, readTextFile, writeTextFile and watchFolder. Neither custom mod needs props.
+The Notes mod consists of main.js, markdown.js and its focusable mod.json. Use native GPUI controls for the editor, preview, checkboxes and font field. Track the card’s focus handle and accept the focus command from pane navigation. The two mods take no props.
 
 Keep a Map of loaded pads per space ID. Each pad holds its path, raw Markdown, last disk snapshot, error/save/loading state and one lazily created native input. Loading a newly selected space starts one asynchronous file read and caches the pad immediately; native text states are created in initialization or a real edit event, never during render. The full-note input updates only its captured pad, even if the active space changes. On close, flush localStorage for recovery.
 

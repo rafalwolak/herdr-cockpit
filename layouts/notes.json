@@ -137,7 +137,7 @@
               "type": "column",
               "hidden": true,
               "size": {
-                "px": 400
+                "px": 368
               },
               "min": 280,
               "max": 900,
@@ -189,7 +189,7 @@
   ],
   "cloned_from": {
     "name": "main",
-    "version": "0.1.13"
+    "version": "0.1.17"
   },
   "preview": "layouts/notes.png"
 }

@@ -1,16 +1,28 @@
-import { View, div } from "gpui-kit";
+import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextareaState, Textarea, TextView, InputState, Input, Checkbox } from "gpui-base";
-import { spaces, theme, settings, home, window, exec, readTextFile, writeTextFile, watchFolder } from "herdr";
+import { spaces, theme, settings, home, window, exec, nextCommand, readTextFile, writeTextFile, watchFolder } from "herdr";
 import { blocks, toggleTask } from "./markdown.js";
 
 export default class Notes extends View {
   init(_props, cx) {
     this.pads = new Map();
+    this.panelFocus = cx.focus_handle();
     this.menu = false;
     this.appearance = false;
     this.prefs = JSON.parse(localStorage.getItem("appearance") ?? "{}");
     this.fontInput = InputState.new({ placeholder: "Follow Herdr", value: this.prefs.font ?? "" });
     this.fontInput.on("change", (_e, cx) => this.preference("font", this.fontInput.value().trim(), cx));
+    for (const event of ["focus", "blur"]) {
+      this.fontInput.on(event, (_e, cx) => {
+        this.fontFocused = event === "focus";
+        cx.notify();
+      });
+    }
+    cx.spawn(async () => {
+      for (;;) {
+        if (await nextCommand() === "focus") this.panelFocus.focus();
+      }
+    });
     const platform = window()?.platform;
     this.platform = platform;
     this.dir = `${home()}${platform === "macos" ? "/Library/Application Support/Herdr/notes" : platform === "windows" ? "/AppData/Local/Herdr/notes" : "/.local/share/herdr/notes"}`;
@@ -229,7 +241,7 @@ export default class Notes extends View {
           .text_color(t.background).text_size(12).items_center().justify_center().flex().cursor_pointer()
           .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
           .on_change((_checked, cx) => {
-            cx.stop_propagation(); this.finish(pad, cx); this.change(pad, toggleTask(pad.text, block), cx);
+            cx.stop_propagation(); this.panelFocus.focus(); this.finish(pad, cx); this.change(pad, toggleTask(pad.text, block), cx);
           }).child(checked ? "✓" : ""))
         .child(div().flex_1().min_w(0).text_color(checked ? t.dim : t.foreground)
           .child(TextView.markdown(`task-label-${pad.id}-${block.start}`, checked ? `~~${match[3]}~~` : match[3]).selectable(false)));
@@ -247,11 +259,15 @@ export default class Notes extends View {
 
   render(cx) {
     const t = theme(), space = spaces().find(s => s.active), s = settings();
-    if (!space) return div().size_full().p(18).text_color(t.muted).child("Open a space to keep notes.");
-    const pad = this.pads.get(space.id) ?? this.load(space, cx);
-    const size = this.prefs.size ?? s.font_size ?? 14;
+    const pad = space ? this.pads.get(space.id) ?? this.load(space, cx) : null;
+    const panel = v_flex().id("notes").relative().size_full().min_w(0).min_h(0).rounded(10).overflow_hidden()
+      .bg(t.background).text_color(t.foreground).text_size(13).border_1()
+      .border_color(pad?.editing || (this.menu && this.appearance && this.fontFocused) ? t.accent : t.border)
+      .track_focus(this.panelFocus).focus(el => el.border_color(t.accent));
+    if (!pad) return panel.child(div().p(14).text_color(t.muted).child("Open a space to keep notes."));
+    const size = this.prefs.size ?? s.ui_font_size ?? 13;
     const leading = this.prefs.leading ?? 1.6;
-    const font = this.prefs.font || s.font_family || "JetBrains Mono";
+    const font = this.prefs.font || s.ui_font_family || "Geist";
     const button = (id, label, action, selected = false) => div().id(id).px(7).py(4).rounded(6).cursor_pointer()
       .when(selected, el => el.bg(t.selected)).text_color(selected ? t.foreground : t.muted)
       .hover(el => el.bg(t.hover).text_color(t.foreground)).on_click(action).child(label);
@@ -260,7 +276,11 @@ export default class Notes extends View {
       : pad.editing
         ? Textarea.new(pad.input).size_full().font_family(font).text_size(size).line_height(`${size * leading}px`)
           .on_key_down((e, cx) => {
-            if (e.key === "escape" || e.keystroke === "cmd-enter") { this.finish(pad, cx); cx.stop_propagation(); }
+            if (e.key === "escape" || e.keystroke === "cmd-enter") {
+              this.finish(pad, cx);
+              this.panelFocus.focus();
+              cx.stop_propagation();
+            }
           })
         : v_flex().id("notes-reading").size_full().min_w(0).gap(5).overflow_y_scrollbar().cursor_text()
           .when(Boolean(pad.text.trim()), el => el.children(blocks(pad.text).map(b => this.section(pad, b, t, size))))
@@ -268,26 +288,30 @@ export default class Notes extends View {
     const closeMenu = cx => { this.menu = false; this.appearance = false; cx.notify(); };
     const menuRow = (id, label, action) => div().id(id).w_full().px(12).py(8).rounded(5).cursor_pointer()
       .text_size(12).text_color(t.foreground).hover(el => el.bg(t.hover)).on_click(action).child(label);
-    return v_flex().relative().size_full().min_w(0).min_h(0).rounded(10)
-      .bg(t.background).text_color(t.foreground).font_family(font).text_size(size).line_height(`${size * leading}px`).overflow_hidden()
+    return panel
       .on_mouse_down_out((_e, cx) => { if (this.menu) closeMenu(cx); })
-      .child(h_flex().h(36).flex_none().px(24).gap(9).items_center()
-        .child(div().text_size(12).font_semibold().child("Notes"))
-        .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.dim).child(space.name))
+      .child(h_flex().h(42).flex_none().pl(14).pr(8).gap(8).items_center().border_b(1).border_color(t.border)
+        .child(div().flex_none().font_semibold().child("Notes"))
+        .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim).child(space.name))
         .when(Boolean(pad.saving), el => el.child(div().text_size(10).text_color(t.dim).child("Saving…")))
-        .child(button("notes-menu", "…", (_e, cx) => {
-          this.menu = !this.menu; if (!this.menu) this.appearance = false; cx.notify();
-        }, this.menu).accessibility_label("Notes menu").tooltip("Appearance and file actions")))
+        .child(div().id("notes-menu").size(22).flex_none().flex().items_center().justify_center().rounded(6)
+          .cursor_pointer().text_color(t.muted).when(this.menu, el => el.bg(t.selected))
+          .hover(el => el.bg(t.raised).text_color(t.foreground))
+          .accessibility_label("Notes menu").tooltip("Appearance and file actions")
+          .on_click((_e, cx) => {
+            this.menu = !this.menu; if (!this.menu) this.appearance = false; cx.notify();
+          }).child(svg("mods/workspace-chrome/settings.svg").size(14))))
       .when(Boolean(this.watchError), el => el.child(div().px(24).py(10).text_size(11).text_color(t.ansi1).child(this.watchError)))
       .when(Boolean(pad.error), el => el.child(v_flex().px(24).py(10).gap(6).text_size(11).text_color(t.ansi1)
         .child(pad.error).child(button("notes-retry", "Retry", (_e, cx) => {
           if (pad.id) this.save(pad, cx);
           else { this.directory = this.prepareDirectory(); this.load(space, cx); }
         }))))
-      .child(div().id("notes-document").flex_1().min_h(0).min_w(0).px(28).pt(24).pb(28)
+      .child(div().id("notes-document").flex_1().min_h(0).min_w(0).px(14).py(12)
+        .font_family(font).text_size(size).line_height(`${size * leading}px`)
         .on_click((_e, cx) => { if (this.menu) closeMenu(cx); this.begin(pad, cx); })
         .on_mouse_down_out((_e, cx) => this.finish(pad, cx)).child(document))
-      .when(this.menu, el => el.child(v_flex().id("notes-menu-body").absolute().top(34).right(12).w(252)
+      .when(this.menu, el => el.child(v_flex().id("notes-menu-body").absolute().top(43).right(8).w(252)
         .p(6).gap(2).rounded(8).bg(t.popover).border_1().border_color(t.border).shadow_md()
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .child(menuRow("notes-appearance", "Appearance", (_e, cx) => { this.appearance = !this.appearance; cx.notify(); }))

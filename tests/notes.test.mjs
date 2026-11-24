@@ -8,11 +8,13 @@ const source = readFileSync(new URL("../mods/notes/main.js", import.meta.url), "
   .replace(/^import .*;\n/gm, "").replace("export default class Notes", "class Notes");
 
 function setup({ store = new Map(), files = new Map(), settings = {} } = {}) {
-  let changed, readGate;
+  let changed, readGate, deliverCommand;
   let active = { id: "one", name: "First space", active: true };
   let rendering = false, failWrites = false, writeGate, clipboard, flushError, flushGate;
   const tasks = [], timers = [], elements = new Map(), writes = [];
+  const panelFocus = { focused: false, focus() { this.focused = true; } };
   const cx = {
+    focus_handle: () => panelFocus,
     notify() { assert.equal(rendering, false, "notify must run outside render"); },
     stop_propagation() {}, sleep: async () => {}, write_to_clipboard(value) { clipboard = value; },
     spawn(fn) { tasks.push(fn(cx)); },
@@ -54,7 +56,8 @@ function setup({ store = new Map(), files = new Map(), settings = {} } = {}) {
       getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value),
       removeItem: key => store.delete(key), flush: async () => { if (flushGate) await flushGate; if (flushError) throw flushError; },
     },
-    spaces: () => [active], settings: () => settings, theme: () => ({}), run() {},
+    spaces: () => [active], settings: () => settings, theme: () => ({ border: "#ddd", accent: "#08f" }), run() {},
+    nextCommand: () => new Promise(resolve => { deliverCommand = resolve; }),
     window: () => ({ platform: "macos" }), home: () => "/home/test",
     exec: async () => ({ code: 0 }),
     watchFolder: () => new Promise(resolve => { changed = resolve; }),
@@ -71,6 +74,7 @@ function setup({ store = new Map(), files = new Map(), settings = {} } = {}) {
   view.init({}, cx);
   return {
     view, cx, store, files, tasks, writes, elements, blocks, toggleTask, get clipboard() { return clipboard; },
+    panelFocus, command(value) { deliverCommand(value); },
     select(id) { active = { id, name: id, active: true }; },
     changed() { changed([path]); }, gateRead(promise) { readGate = promise; },
     failWrites(value) { failWrites = value; }, gate(promise) { writeGate = promise; },
@@ -217,13 +221,13 @@ test("font and line-spacing preferences persist independently of note text", asy
 });
 
 
-test("the raw editor inherits Herdr's terminal font and follows appearance overrides", async () => {
+test("the raw editor inherits Herdr's UI font and follows appearance overrides", async () => {
   const app = setup({ settings: { font_family: "JetBrains Mono", font_size: 15, ui_font_family: "Geist", ui_font_size: 13 } });
   await app.settle();
   const pad = app.view.pads.get("one");
   app.view.begin(pad, app.cx); app.render();
-  assert.equal(app.elements.get("raw-editor").styles.font_family, "JetBrains Mono");
-  assert.equal(app.elements.get("raw-editor").styles.text_size, 15);
+  assert.equal(app.elements.get("raw-editor").styles.font_family, "Geist");
+  assert.equal(app.elements.get("raw-editor").styles.text_size, 13);
   app.view.preference("font", "Georgia", app.cx);
   app.view.preference("size", 20, app.cx);
   app.render();
@@ -231,6 +235,48 @@ test("the raw editor inherits Herdr's terminal font and follows appearance overr
   assert.equal(app.elements.get("raw-editor").styles.text_size, 20);
 });
 
+
+test("keyboard focus reaches the card and each text input uses its accent border", async () => {
+  const app = setup();
+  await app.settle();
+  const border = () => {
+    app.render();
+    return app.elements.get("notes").styles.border_color;
+  };
+  assert.equal(border(), "#ddd");
+  const card = app.elements.get("notes");
+  assert.equal(card.styles.track_focus, app.panelFocus);
+  let focusColor;
+  card.styles.focus({ border_color(value) { focusColor = value; } });
+  assert.equal(focusColor, "#08f");
+  app.command("focus");
+  await app.settle();
+  assert.equal(app.panelFocus.focused, true);
+  app.elements.get("notes-document").handlers.on_click({}, app.cx);
+  assert.equal(border(), "#08f");
+  app.view.pads.get("one").input.handlers.blur({}, app.cx);
+  assert.equal(border(), "#ddd");
+  app.elements.get("notes-menu").handlers.on_click({}, app.cx);
+  app.render();
+  app.elements.get("notes-appearance").handlers.on_click({}, app.cx);
+  app.view.fontInput.handlers.focus({}, app.cx);
+  assert.equal(border(), "#08f");
+  app.view.fontInput.handlers.blur({}, app.cx);
+  assert.equal(border(), "#ddd");
+});
+
+test("the sidebar pairs Notes with the stock Files and Changes panels", () => {
+  const layout = JSON.parse(readFileSync(new URL("../layouts/notes.json", import.meta.url), "utf8"));
+  const work = layout.children.find(node => node.id === "work");
+  const tabs = work.children.find(node => node.id === "tabs");
+  const body = work.children.find(node => node.id === "work-body");
+  const panel = body.children.find(node => node.id === "panel");
+  const stack = panel.children.find(node => node.id === "panel-body");
+  assert.equal(tabs.content.mod, "notes-tabs");
+  assert.deepEqual(stack.children.map(node => [node.id, node.content.mod]), [
+    ["files", "files"], ["changes", "changes"], ["notes", "notes"],
+  ]);
+});
 
 test("the single menu exposes appearance and file actions without editing the note", async () => {
   const text = "A quiet thought";
