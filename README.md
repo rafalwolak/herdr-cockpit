@@ -1,48 +1,80 @@
 # Herdr Cockpit
 
-A Herdr layout for working across spaces, agents and machines. The **Notes** layout adds four controls to the native window.
+Herdr Cockpit adds per-space Markdown notes, nested space groups, agent limits and host resource monitoring to Herdr desktop. Select **Notes** in Herdr’s layout picker to use it.
 
-- **Space groups** organize spaces into nested folders on each machine. Right-click a space and choose **Move to group…**. Right-click a group and choose **Add Sub Group…**.
-- **Agent usage** shows remaining context beneath Codex and Claude Code agents. Click the bottom status bar to inspect the focused agent’s context, 5-hour and weekly limits, reset times and an hour of readings. Values appear as the agent reports them.
-- **Host resources** shows CPU and RAM beside the Notes button. Click a host for a five-minute CPU graph, memory, swap, disk space, network throughput, load and uptime. The panel includes a host picker when the toolbar is narrow.
-- **Markdown notes** save automatically per space. Open **Notes** beside **Files** and **Changes**.
+<img src="preview.png" width="378" alt="A Markdown release checklist open in the Notes panel beside Files and Changes">
 
-<img src="preview.png" width="378" alt="The focused Notes panel beside Files and Changes, showing a release checklist in the Studio space">
+## Inside the layout
+
+| Where | What you can do |
+| --- | --- |
+| **Notes** beside **Files** and **Changes** | Click the page to edit. Press **Escape** or click outside to return to the preview. Check off tasks directly in the preview. All tabs in a space share the same note. |
+| **Spaces** sidebar | Right-click a space, choose **Move to group…**, then select a group or type a new name. Right-click a group and choose **Add Sub Group…** to nest it. Each machine has its own groups. |
+| **Agents** sidebar and bottom status bar | See remaining context under Codex and Claude Code agents. Click the focused agent’s usage in the bottom bar for its five-hour and weekly limits, reported reset times and the past hour of usage. Remaining capacity turns amber at 20% and red at 10%. |
+| **Host indicator** beside **Notes** | See CPU and RAM for local and connected hosts. Click the indicator to pick a host and inspect its five-minute CPU graph, memory, swap, free space on the home volume, network throughput, load and uptime. On narrow windows, use the host icon. |
 
 ## Install
 
-In a Herdr chat, ask your agent to install this layout.
+Start Herdr desktop with its `herdr-app` CLI on `PATH`. Cockpit was tested with Herdr desktop 0.1.18 on macOS and a Linux host over SSH. Host monitoring supports macOS and Linux with Python 3.8 or later as `python3`. The Spaces sidebar uses Git on the machine that owns the checkout.
 
-> Read my Herdr app's AGENTS.md and install the Notes layout from https://github.com/rafalwolak/herdr-cockpit.
+### From a Herdr chat
 
-For a manual install, copy the five directories below from the checkout’s `mods/` into your Herdr app’s `mods/`. On a fresh install, copy `layouts/notes.json` and `layouts/notes.png` into the app’s `layouts/`. To upgrade a customized Notes layout, apply these bindings to its existing blocks.
+> Install the Notes layout from https://github.com/rafalwolak/herdr-cockpit. Follow the repository and installed Herdr AGENTS.md files. Keep my existing layout customizations.
 
-| Layout block ID | `content.mod` and directory name |
-| --- | --- |
-| `spaces` | `notes-space-groups` |
-| `agents` | `notes-usage-agents` |
-| `tabs` | `notes-tabs` |
-| `notes` in `panel-body` | `notes` |
-| `status` | `notes-usage-status` |
+### From a terminal on macOS or Linux
 
-On macOS or Linux, validate the mods and activate the layout.
+For a **first install**, clone the repository and run the commands below. They stop before copying if a destination already exists.
+
+```sh
+git clone https://github.com/rafalwolak/herdr-cockpit.git
+cd herdr-cockpit
+```
 
 ```sh
 (
-  set -e
+  set -eu
   app_dir="${HERDR_APP_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app}"
-  for mod in notes notes-tabs notes-space-groups notes-usage-agents notes-usage-status; do
-    herdr-app check "$app_dir/mods/$mod"
+
+  for entry in mods/* layouts/notes.json layouts/notes.png; do
+    if [ -e "$app_dir/$entry" ] || [ -L "$app_dir/$entry" ]; then
+      printf 'Destination already exists at %s\n' "$app_dir/$entry" >&2
+      exit 1
+    fi
   done
-  herdr-app do layout.switch '{"name":"notes"}'
+
+  mkdir -p "$app_dir/mods" "$app_dir/layouts"
+  cp -R mods/* "$app_dir/mods/"
+  cp layouts/notes.json layouts/notes.png "$app_dir/layouts/"
 )
 ```
 
-Host metrics use Python 3.8+ on each monitored macOS or Linux machine. Herdr runs the sampler through its existing connection. The Spaces sidebar runs Git on the space’s host. The usage bar reads Herdr terminal footers and labels through `hc`. For Codex, it can also query the installed `codex app-server` for account limits or read the matching Herdr Chat rollout.
+### Upgrade an existing Notes layout
 
-### Claude Code reset times
+Update your checkout with `git pull --ff-only`. Compare the five `mods/` directories with their installed copies and merge any local edits. In a customized `layouts/notes.json`, apply the five block bindings and keep your other panels, menus and sizes. The packaged layout and its preview can replace an unmodified copy. [Layout bindings](AGENTS.md#layout-bindings)
 
-For exact resets on macOS or Linux, register `claude_status.py` as a Claude Code status-line command on each machine where Claude runs. On an SSH host, copy that one file to the same mod path under the remote user’s Herdr app home. Merge the following field into your Claude Code settings.
+### Activate and verify
+
+After installing or updating, run this from the checkout with Herdr open.
+
+```sh
+(
+  set -eu
+  app_dir="${HERDR_APP_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app}"
+  for mod in mods/*; do
+    herdr-app check "$app_dir/$mod"
+  done
+  herdr-app do layout.switch '{"name":"notes"}'
+  herdr-app status
+)
+```
+
+The status output should show `"layout": "notes"` and `"errors": []`. To return to Herdr’s default layout, run `herdr-app do layout.switch '{"name":"main"}'`. Open terminals keep running.
+
+## Agent usage and reset times
+
+Cockpit reads agent status from Herdr terminal labels and footers through `hc`. It can also query `codex app-server` for account limits. For Codex sessions opened through Herdr Chat, it reads usage from the matching session log. **Usage pending** means the focused session has yet to report a recognized reading. The status bar shows capacity remaining. The history chart plots capacity used.
+
+Claude Code can report usage through a recognized terminal footer. For exact reset times on macOS or Linux, merge this optional field into Claude Code’s user settings (normally `~/.claude/settings.json`) on each machine where Claude runs. On an SSH host, first copy `mods/notes-usage-status/claude_status.py` to the same mod path under that host’s Herdr app home. Reset timestamps appear when Claude supplies them. [Claude Code status-line settings](https://code.claude.com/docs/en/statusline)
 
 ```json
 {
@@ -53,13 +85,21 @@ For exact resets on macOS or Linux, register `claude_status.py` as a Claude Code
 }
 ```
 
-If you already have a status-line renderer, pass its existing command as one shell-quoted argument after `claude_status.py`. The wrapper forwards the original JSON on stdin and preserves the renderer’s output and exit code. With no renderer argument it only publishes the metrics to the current Herdr terminal. The terminal-footer fallback works without this setup.
+If you have a status-line renderer, append its existing command as one shell-quoted argument to `claude_status.py`. The bridge passes through its input, output and exit code. With the example above, usage appears in Herdr and the Claude terminal status line is blank.
 
-## Notes
+## Notes and storage
 
-Click the note to edit. Press **Escape** or click outside it to return to the formatted preview. Click a checkbox in the preview to update the task. The gear menu contains appearance settings, **Reveal file**, **Copy path**, **Clear note** and **Undo clear**.
+Notes autosaves Markdown on the computer running Herdr, including notes for SSH spaces. Each filename uses the space ID, so renaming a space keeps its note. Use the gear menu to **Reveal file**, **Copy path**, change appearance or undo a cleared note. External edits refresh the preview. If a file changes while you have unsaved edits, Notes keeps your draft for a manual merge.
 
-To use **Option+Shift+N** on macOS, add the following section to your existing `keys.json`.
+| Desktop platform | Notes directory |
+| --- | --- |
+| macOS | `~/Library/Application Support/Herdr/notes/` |
+| Linux | `~/.local/share/herdr/notes/` |
+| Windows | `~/AppData/Local/Herdr/notes/` |
+
+Herdr saves group membership and collapse state in shared `space-groups` data and keeps up to an hour of usage readings per agent session in mod storage. The five-minute host graph lives in memory.
+
+To toggle Notes with **Option+Shift+N** on macOS, merge this binding into your Herdr app’s `keys.json`.
 
 ```json
 {
@@ -69,26 +109,18 @@ To use **Option+Shift+N** on macOS, add the following section to your existing `
 }
 ```
 
-## Storage
-
-Each file is named for its space ID. Renaming a space keeps its note. External edits appear in the panel. If a local draft conflicts with a file on disk, Notes keeps the draft for a manual merge.
-
-| Platform | Notes directory |
-| --- | --- |
-| macOS | `~/Library/Application Support/Herdr/notes/` |
-| Linux | `~/.local/share/herdr/notes/` |
-| Windows | `~/AppData/Local/Herdr/notes/` |
-
-Group membership and collapse state live in Herdr’s shared `space-groups` data. The usage bar stores up to 60 minutes of usage percentages per session in its mod storage. The host resource graph keeps the last five minutes in memory.
-
 ## Development
 
-Verified with Herdr desktop 0.1.18 on macOS and a Linux SSH host. Run the regression tests with Node.js and Python 3.
+Herdr loads the JavaScript mods directly. Run the tests from the repository root with Node.js and Python 3. Node.js 22.22 and Python 3.13 are a tested combination.
 
 ```sh
 node --test tests/*.test.mjs
 ```
 
-The Notes panel is based on itspanicky’s layout. The tabs, status bar and sidebars adapt Herdr’s native mods. [Original Notes](https://github.com/itspanicky/herdr-notes) · [Herdr desktop](https://github.com/herdrdev/herdr-app/tree/v0.1.18) · [Apache license](mods/notes-space-groups/LICENSE-APACHE)
+The layout recipe describes native interactions and visual details. The contributor guide covers mod boundaries and how to verify changes in Herdr. [Layout recipe](RECIPE.md) · [Agent instructions](AGENTS.md)
 
-Nested groups are adapted from Space Groups. The optional chat peek adapter is from Herdr Chat. [Space Groups](https://github.com/suppa-duppa-labs/herdr-space-groups) · [Group notices](mods/notes-space-groups/NOTICE) · [Herdr Chat](https://github.com/ChmaraX/herdr-chat) · [Chat adapter license](mods/notes-usage-agents/LICENSE-CHAT)
+## Credits
+
+Cockpit is a fork of itspanicky’s Notes layout and adapts native Herdr tabs, sidebars and status controls. [Original Notes](https://github.com/itspanicky/herdr-notes) · [Herdr desktop](https://github.com/herdrdev/herdr-app/tree/v0.1.18) · [Apache 2.0](mods/notes-space-groups/LICENSE-APACHE)
+
+Nested groups build on Space Groups. The optional chat peek integration comes from Herdr Chat. [Space Groups](https://github.com/suppa-duppa-labs/herdr-space-groups) · [Group notices](mods/notes-space-groups/NOTICE) · [Icon licenses](mods/notes-space-groups/LICENSE-ICONS) · [Herdr Chat](https://github.com/ChmaraX/herdr-chat) · [Chat adapter license](mods/notes-usage-agents/LICENSE-CHAT)
